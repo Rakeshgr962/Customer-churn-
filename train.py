@@ -6,13 +6,21 @@ import matplotlib.pyplot as plt
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, ConfusionMatrixDisplay
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    ConfusionMatrixDisplay,
+)
 
 from xgboost import XGBClassifier
 
-# Load dataset
+# -----------------------
+# Load Dataset
+# -----------------------
 df = pd.read_csv("data/telco.csv")
+
 # Remove leakage columns
 df.drop(columns=[
     "Customer ID",
@@ -40,7 +48,7 @@ joblib.dump(encoders, "label_encoders.pkl")
 X = df.drop("Churn Label", axis=1)
 y = df["Churn Label"]
 
-# Split
+# Train Test Split
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
@@ -49,44 +57,65 @@ X_train, X_test, y_train, y_test = train_test_split(
     stratify=y
 )
 
-models = {
-    "RandomForest": RandomForestClassifier(random_state=42),
-    "XGBoost": XGBClassifier(
+# -----------------------
+# MLflow
+# -----------------------
+mlflow.set_experiment("Customer_Churn_XGBoost")
+
+with mlflow.start_run(run_name="XGBoost"):
+
+    model = XGBClassifier(
         random_state=42,
+        n_estimators=200,
+        max_depth=6,
+        learning_rate=0.1,
         eval_metric="logloss"
     )
-}
 
-mlflow.set_experiment("Customer_Churn")
+    model.fit(X_train, y_train)
 
-best_accuracy = 0
+    predictions = model.predict(X_test)
 
-for name, model in models.items():
+    accuracy = accuracy_score(y_test, predictions)
+    precision = precision_score(y_test, predictions)
+    recall = recall_score(y_test, predictions)
+    f1 = f1_score(y_test, predictions)
 
-    with mlflow.start_run(run_name=name):
+    # Log Parameters
+    mlflow.log_param("Model", "XGBoost")
+    mlflow.log_param("n_estimators", 200)
+    mlflow.log_param("max_depth", 6)
+    mlflow.log_param("learning_rate", 0.1)
 
-        model.fit(X_train, y_train)
+    # Log Metrics
+    mlflow.log_metric("Accuracy", accuracy)
+    mlflow.log_metric("Precision", precision)
+    mlflow.log_metric("Recall", recall)
+    mlflow.log_metric("F1 Score", f1)
 
-        pred = model.predict(X_test)
+    # Confusion Matrix
+    disp = ConfusionMatrixDisplay.from_predictions(
+        y_test,
+        predictions
+    )
 
-        accuracy = accuracy_score(y_test, pred)
+    plt.savefig("confusion_matrix.png")
+    plt.close()
 
-        mlflow.log_param("model", name)
-        mlflow.log_metric("accuracy", accuracy)
+    mlflow.log_artifact("confusion_matrix.png")
 
-        disp = ConfusionMatrixDisplay.from_predictions(y_test, pred)
+    # Log Model
+    mlflow.sklearn.log_model(
+        sk_model=model,
+        name="XGBoost_Model",
+        input_example=X_test.iloc[:5]
+    )
 
-        plt.savefig("confusion_matrix.png")
-        plt.close()
+    # Save Model
+    joblib.dump(model, "customer_churn_model.joblib")
 
-        mlflow.log_artifact("confusion_matrix.png")
-
-        mlflow.sklearn.log_model(model, "model")
-
-        print(name, accuracy)
-
-        if accuracy > best_accuracy:
-            best_accuracy = accuracy
-            joblib.dump(model, "customer_churn_model.joblib")
-
-print("Best Model Saved")
+print(f"Accuracy : {accuracy:.4f}")
+print(f"Precision: {precision:.4f}")
+print(f"Recall   : {recall:.4f}")
+print(f"F1 Score : {f1:.4f}")
+print("Model Saved Successfully!")

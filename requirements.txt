@@ -1,4 +1,9 @@
 pandas
+numpy
 scikit-learn
+xgboost
 mlflow
-flask
+joblib
+matplotlib
+fastapi
+uvicorn
