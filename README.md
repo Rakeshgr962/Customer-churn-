@@ -2,7 +2,7 @@
 
 A machine learning project that predicts whether a telecom customer is likely to churn using **XGBoost**. The model is deployed as a **FastAPI REST API** on Render.
 
-**🔗 Live API:** https://customer-churn-prediction.onrender.com/
+**🔗 Live API:** https://customer-churn-72v1.onrender.com
 
 ## 🚀 Features
 
